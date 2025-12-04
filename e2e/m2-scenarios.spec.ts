@@ -38,9 +38,9 @@ test.describe('M2-WP1/2: Caregiver Entry & Agreement', () => {
     // we can read the input value.
     await expect(page.getByText('링크 복사')).toBeVisible();
     const linkUrl = await page.inputValue('input[readonly]'); 
-    // linkUrl like "http://localhost:3000/enter/abc123token..."
+    // linkUrl like "http://localhost:3000/caregiver/abc123token..."
     // Extract token
-    token = linkUrl.split('/enter/')[1];
+    token = linkUrl.split('/caregiver/')[1];
     
     await context.close();
   });
@@ -116,7 +116,7 @@ test.describe('M2-WP3: Care Log', () => {
     await page.click('[data-testid="submit-agreement-button"]');
     
     const linkUrl = await page.inputValue('input[readonly]'); 
-    token = linkUrl.split('/enter/')[1];
+    token = linkUrl.split('/caregiver/')[1];
     
     // Caregiver Agree
     await page.goto(`/caregiver/${token}`);

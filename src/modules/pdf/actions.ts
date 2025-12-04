@@ -1,19 +1,6 @@
 "use server";
 
 import { createClient } from "@/modules/shared/lib/supabase/server";
-import { redirect } from "next/navigation";
-import React from 'react';
-import { renderToStream } from '@react-pdf/renderer';
-import { CasePdfDocument } from "./components/CasePdfDocument";
-
-// Note: Server Actions cannot return a stream directly to the client in a way that triggers download easily 
-// without using a Route Handler. Server Actions are for data mutation mostly.
-// To download a file, we usually use a Route Handler (GET request).
-// So I will create a Route Handler `src/app/api/pdf/[caseId]/route.ts` instead of a pure server action for the download.
-// But I can use a server action to VALIDATE and then return a success flag or URL.
-// Actually, the user wants a button "Generate PDF". 
-// I'll implement a Route Handler for the actual generation and download.
-// The server action `checkPdfRequirements` can be used by UI to enable/disable the button or show warnings.
 
 export async function checkPdfRequirements(caseId: string) {
     const supabase = createClient();
@@ -45,7 +32,7 @@ export async function checkPdfRequirements(caseId: string) {
         .from("payments")
         .select("*")
         .eq("case_id", caseId)
-        .single();
+        .maybeSingle();
     
     if (!payment) errors.push("지급 정보가 입력되지 않았습니다.");
 
@@ -55,4 +42,3 @@ export async function checkPdfRequirements(caseId: string) {
 
     return { success: true };
 }
-

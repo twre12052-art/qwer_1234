@@ -33,7 +33,7 @@ test.describe('M3 Scenarios: Payment & PDF', () => {
     await page.click('[data-testid="submit-agreement-button"]');
     
     const linkUrl = await page.inputValue('input[readonly]'); 
-    token = linkUrl.split('/enter/')[1];
+    token = linkUrl.split('/caregiver/')[1];
     
     await context.close();
   });
@@ -80,7 +80,7 @@ test.describe('M3 Scenarios: Payment & PDF', () => {
     
     // Need Caregiver Agreement for IN_PROGRESS
     const linkUrl = await page.inputValue('input[readonly]');
-    const token = linkUrl.split('/enter/')[1];
+    const token = linkUrl.split('/caregiver/')[1];
     
     const cgContext = await page.context().browser().newContext();
     const cgPage = await cgContext.newPage();

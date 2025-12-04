@@ -8,7 +8,7 @@ export function CopyLinkButton({ token }: { token: string }) {
 
   useEffect(() => {
     // Set link only on client side to avoid hydration mismatch
-    setLink(`${window.location.origin}/enter/${token}`);
+    setLink(`${window.location.origin}/caregiver/${token}`);
   }, [token]);
 
   const handleCopy = () => {

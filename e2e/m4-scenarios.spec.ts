@@ -33,7 +33,7 @@ test.describe('M4: Representative Scenarios (Integrated QA)', () => {
       await page.click('[data-testid="submit-agreement-button"]');
 
       const linkUrl = await page.inputValue('input[readonly]');
-      token = linkUrl.split('/enter/')[1];
+      token = linkUrl.split('/caregiver/')[1];
       expect(token).toBeTruthy();
     });
 
@@ -110,7 +110,7 @@ test.describe('M4: Representative Scenarios (Integrated QA)', () => {
 
       // Get Token
       const linkUrl = await page.inputValue('input[readonly]');
-      const token = linkUrl.split('/enter/')[1];
+      const token = linkUrl.split('/caregiver/')[1];
 
       // Caregiver Joins (but DOES NOT WRITE LOG)
       const cgContext = await browser.newContext();
@@ -182,7 +182,7 @@ test.describe('M4: Edge Scenarios (Period Management)', () => {
         await guardianPage.click('[data-testid="submit-agreement-button"]');
         
         const linkUrl = await guardianPage.inputValue('input[readonly]');
-        token = linkUrl.split('/enter/')[1];
+        token = linkUrl.split('/caregiver/')[1];
     });
 
     test.afterAll(async () => {
