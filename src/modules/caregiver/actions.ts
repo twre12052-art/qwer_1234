@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/modules/shared/lib/supabase/server";
+import { createAdminClient } from "@/modules/shared/lib/supabase/admin";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -39,6 +40,7 @@ export async function getCaseByToken(token: string) {
 
 export async function agreeCaregiver(token: string, caseId: string, formData: FormData) {
     const supabase = createClient();
+    const adminSupabase = createAdminClient(); // RLS 우회용
 
     // Re-validate token just in case
     const { data: tokenData } = await supabase
@@ -54,9 +56,6 @@ export async function agreeCaregiver(token: string, caseId: string, formData: Fo
     const caregiver_name = formData.get("caregiver_name") as string;
     const caregiver_phone = formData.get("caregiver_phone") as string;
     const caregiver_birth_date = formData.get("caregiver_birth_date") as string;
-    // Address field is currently not in DB schema, but required by UI.
-    // We'll skip saving it for now or store it if schema is updated.
-    // For M2 MVP, we process other fields.
     const address = formData.get("address") as string;
     
     const caregiver_account_bank = formData.get("caregiver_account_bank") as string;
@@ -66,8 +65,8 @@ export async function agreeCaregiver(token: string, caseId: string, formData: Fo
         return { error: "필수 정보를 모두 입력해주세요." };
     }
 
-    // Update case
-    const { error } = await supabase
+    // Update case (adminSupabase로 RLS 우회)
+    const { data: updateResult, error } = await adminSupabase
         .from("cases")
         .update({
             caregiver_name, 
@@ -76,12 +75,32 @@ export async function agreeCaregiver(token: string, caseId: string, formData: Fo
             caregiver_account_bank,
             caregiver_account_number,
             caregiver_agreed_at: new Date().toISOString(),
-            status: "IN_PROGRESS" 
+            status: "IN_PROGRESS",
+            updated_at: new Date().toISOString()
         })
-        .eq("id", caseId);
+        .eq("id", caseId)
+        .select();
 
-    if (error) return { error: error.message };
+    if (error) {
+        console.error("간병인 동의 처리 에러:", error);
+        return { error: error.message };
+    }
 
+    if (!updateResult || updateResult.length === 0) {
+        console.error("케이스 업데이트 실패: 결과 없음");
+        return { error: "케이스 업데이트에 실패했습니다." };
+    }
+
+    console.log("✅ 간병인 동의 완료:", {
+        caseId,
+        status: updateResult[0].status,
+        caregiver_agreed_at: updateResult[0].caregiver_agreed_at
+    });
+
+    // 보호자 페이지도 revalidate
+    revalidatePath(`/cases`);
+    revalidatePath(`/cases/${caseId}`);
     revalidatePath(`/caregiver/${token}`);
+    
     redirect(`/caregiver/${token}/logs`);
 }

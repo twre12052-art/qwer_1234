@@ -1,0 +1,123 @@
+# 🛠 간병노트 2차 기술 스택 (최종본)
+
+## 1. 프론트엔드
+
+- **Next.js 14 (App Router)**
+- **React 18**
+- **TypeScript**
+- **Tailwind CSS**
+- **lucide-react** (아이콘)
+- **react-hook-form + zod**
+  - 폼 상태 관리 및 검증
+  - 날짜/필수값/형식 체크
+
+---
+
+## 2. 서버/백엔드 역할
+
+> 별도 백엔드 서버(Express/Nest) 없이  
+> **Next.js Route Handlers / Server Actions** 만으로 구현
+
+- 주요 API 엔드포인트:
+  - `/api/auth/phone-otp`
+    - 휴대폰 번호 입력 → 6자리 인증번호 생성 및 문자 발송
+  - `/api/auth/phone-verify`
+    - 인증번호 확인 → 계정 생성/로그인 및 세션 발급
+  - `/api/cases`
+    - 케이스 생성/조회/변경(보호자용)
+  - `/api/care-logs`
+    - 간병일지 작성/조회(간병인/보호자용)
+  - `/api/admin/cases`
+    - 강제 종료, 기간 수정, 링크 재발송(운영자용)
+  - `/api/pdfs/[caseId]`
+    - 케이스/일지 데이터를 기반으로 PDF 생성
+  - `/api/send-email`
+    - PDF를 이메일로 전송 (Gmail SMTP)
+  - `/api/notification`
+    - 카카오 알림톡 발송
+
+---
+
+## 3. 데이터베이스 & 인증 (Supabase)
+
+- **Supabase Postgres (Free)**
+- **Supabase Auth**
+  - 인증:
+    - 사용자 입장: 휴대폰 번호 + 6자리 문자 인증
+    - 내부 Auth 계정: `휴대폰번호@care.local` 형태의 가짜 이메일 사용
+- 주요 테이블:
+  - `users`
+    - id, auth_email, name, birth_date, contact_email, phone, phone_verified_at, role
+  - `cases`
+    - id, guardian_id, patient_name, hospital_name, start_date, end_date_planned, end_date_final, status, created_at, updated_at
+  - `care_logs`
+    - id, case_id, date, content, created_by, created_at, updated_at
+  - `case_tokens`
+    - id, case_id, token 또는 token_hash, caregiver_phone, expired_at, created_at
+  - `phone_otps`
+    - phone, code_hash, expires_at, created_at
+  - `activity_logs`
+    - id, user_id, case_id, action, meta(jsonb), created_at
+  - `notification_logs`
+    - id, channel(예: sms_auth, kakao_alert, email_submit), to, template, status, created_at
+
+- **RLS(Row Level Security)**:
+  - 보호자:
+    - `cases.guardian_id = auth.uid()` 인 레코드만 접근
+  - 간병인:
+    - `case_tokens`로 연결된 케이스의 `care_logs`만 작성/조회
+  - 운영자:
+    - `role = 'admin'` 인 사용자는 전체 접근 허용
+
+- **pg_cron**:
+  - 매일 종료일이 지난 케이스를 `active → ended`로 자동 변경
+  - 추후(3차) 데이터 익명화/정리 작업 예약에 활용 예정
+
+---
+
+## 4. 외부 서비스
+
+### 4.1 Solapi (SMS & 카카오)
+
+- **SMS (문자)**
+  - 용도: 휴대폰 인증번호(6자리 코드) 전송 **전용**
+- **카카오 알림톡**
+  - 용도:
+    - 간병 시작 안내
+    - 간병인 링크 안내/재발송
+    - 간병 종료/조기 종료 후 서류 발급 안내
+    - (선택) 일지 작성 리마인드
+
+### 4.2 Gmail SMTP + nodemailer
+
+- 전용 Gmail 계정 + 앱 비밀번호 사용
+- 용도:
+  - 보호자가 요청한 이메일 주소로 PDF 서류 전송
+- 알림용이 아니라 **“서류 수신/제출” 용도**로만 사용
+
+---
+
+## 5. 인프라 & 비용 구조
+
+- **Vercel Free**
+  - Next.js 앱 및 API 배포
+- **Supabase Free**
+  - DB + Auth + Storage + pg_cron
+- **Solapi**
+  - 문자/카카오 발송 건당 과금 (월 고정비 없음)
+- **Gmail**
+  - 초기 사용량에서는 사실상 무료 수준
+
+> 목표: **수익 발생 전까지 고정비 0원에 가깝게 유지**,  
+> 문자/카카오 발송 건수에 따른 **변동비만 부담**하는 구조.
+---
+
+## 6. 보안/데이터 처리 전략 (2차 기준)
+
+- 휴대폰 인증번호(6자리)는 DB에 **평문이 아닌 해시**로 저장
+- 간병인 링크 토큰은:
+  - URL에는 원본 토큰 사용,
+  - DB에는 가능한 한 토큰의 해시만 저장하는 방향(2차~3차 사이 적용)
+- 운영자(Admin) 전용 API:
+  - Supabase RLS 외에도, 서버에서 `role = 'admin'` 검증을 한 번 더 수행
+- **구체적인 데이터 보관 기간, 익명화 로직은 3차 설계 범위**

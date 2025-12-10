@@ -54,7 +54,7 @@ export default function AgreementPage({ params }: { params: { id: string } }) {
               setChecked(e.target.checked);
               setError(null);
           }}
-          className="h-5 w-5 rounded border-gray-300 text-indigo-600 focus:ring-indigo-600"
+          className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-600"
         />
         <label htmlFor="agree" className="text-gray-900 font-medium select-none">
           위 계약 내용을 모두 확인하였으며 이에 동의합니다.
@@ -67,7 +67,7 @@ export default function AgreementPage({ params }: { params: { id: string } }) {
         onClick={handleAgree}
         disabled={loading}
         data-testid="submit-agreement-button"
-        className="w-full bg-indigo-600 text-white py-3 rounded-md hover:bg-indigo-700 disabled:opacity-50 font-bold"
+        className="w-full bg-gradient-to-r from-blue-500 to-sky-500 text-white py-3 rounded-md hover:from-blue-600 hover:to-sky-600 disabled:opacity-50 font-bold transition-all"
       >
         {loading ? "처리 중..." : "동의합니다"}
       </button>

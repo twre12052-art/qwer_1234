@@ -25,11 +25,12 @@ export default async function EditPeriodPage({
   async function updatePeriod(formData: FormData) {
       "use server";
       const newDate = formData.get("newDate") as string;
+      const caregiverConsent = formData.get("caregiverConsent") === "on";
       
       if (isEarly) {
-          await endCaseEarly(params.id, newDate);
+          await endCaseEarly(params.id, newDate, caregiverConsent);
       } else {
-          await extendCase(params.id, newDate);
+          await extendCase(params.id, newDate, caregiverConsent);
       }
   }
 
@@ -57,13 +58,14 @@ export default async function EditPeriodPage({
                 required 
                 data-testid="period-date-input"
                 className="w-full border rounded-md px-3 py-2"
-                // Minimal validation hints
-                max={isEarly ? new Date().toISOString().split('T')[0] : undefined}
-                min={!isEarly ? currentEndDate : undefined}
+                // 조기종료: 시작일 이후 ~ 기존 종료일 이전, 오늘 이후만 가능
+                // 기간연장: 기존 종료일 이후만 가능
+                min={isEarly ? (new Date() > new Date(caseData.start_date) ? new Date().toISOString().split('T')[0] : caseData.start_date) : currentEndDate}
+                max={isEarly ? currentEndDate : undefined}
               />
               {isEarly && (
                   <p className="text-xs text-gray-500 mt-1">
-                      * 조기 종료 시 오늘 또는 과거 날짜로 설정합니다.
+                      * 조기 종료 시 시작일 이후 ~ 기존 종료일 이전, 오늘 이후 날짜만 가능합니다.
                   </p>
               )}
               {!isEarly && (
@@ -71,6 +73,27 @@ export default async function EditPeriodPage({
                       * 연장 시 기존 종료일보다 늦은 날짜를 선택해주세요.
                   </p>
               )}
+          </div>
+
+          {/* 간병인 동의 체크박스 */}
+          <div className="pt-4 border-t border-gray-200">
+              <div className="flex items-start">
+                  <input 
+                      type="checkbox" 
+                      name="caregiverConsent" 
+                      id="caregiverConsent"
+                      required
+                      className="mt-1 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor="caregiverConsent" className="ml-3 text-base text-gray-700">
+                      <span className="font-semibold">간병인 동의를 구했습니다.</span>
+                      <p className="text-sm text-gray-500 mt-1">
+                          {isEarly 
+                              ? "조기 종료 시 간병인에게 사전에 동의를 받아야 합니다." 
+                              : "기간 연장 시 간병인에게 사전에 동의를 받아야 합니다."}
+                      </p>
+                  </label>
+              </div>
           </div>
 
           <div className="pt-4">

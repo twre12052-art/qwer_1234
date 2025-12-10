@@ -6,9 +6,18 @@ import { revalidatePath } from "next/cache";
 
 export async function getCases() {
   const supabase = createClient();
+  
+  // 현재 로그인한 사용자 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  // 현재 사용자의 케이스만 조회 (guardian_id 필터링)
   const { data: cases, error } = await supabase
     .from("cases")
     .select("*")
+    .eq("guardian_id", user.id) // ⭐ 보안: 본인의 케이스만 조회
     .order("created_at", { ascending: false });
 
   if (error) {
@@ -16,20 +25,50 @@ export async function getCases() {
     return [];
   }
 
-  return cases;
+  return cases || [];
 }
 
 export async function getCase(id: string) {
   const supabase = createClient();
+  
+  // 현재 로그인한 사용자 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    redirect("/login");
+  }
+
+  // 케이스 조회 (본인의 케이스만)
   const { data: caseData, error } = await supabase
     .from("cases")
     .select("*")
     .eq("id", id)
+    .eq("guardian_id", user.id) // ⭐ 보안: 본인의 케이스만 조회
     .single();
 
   if (error) {
     console.error("Error fetching case:", error);
     return null;
+  }
+
+  // 간병 기간 종료 시 상태 자동 업데이트
+  if (caseData && caseData.status === 'IN_PROGRESS' && caseData.caregiver_agreed_at) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endDate = new Date(caseData.end_date_final || caseData.end_date_expected);
+    endDate.setHours(0, 0, 0, 0);
+
+    // 종료일이 지났으면 상태를 COMPLETED로 변경
+    if (today > endDate) {
+      const { error: updateError } = await supabase
+        .from("cases")
+        .update({ status: "COMPLETED" })
+        .eq("id", id)
+        .eq("guardian_id", user.id);
+
+      if (!updateError) {
+        caseData.status = "COMPLETED";
+      }
+    }
   }
 
   return caseData;
@@ -139,7 +178,7 @@ export async function getCaseToken(caseId: string) {
     return data?.token;
 }
 
-export async function endCaseEarly(caseId: string, newEndDate: string) {
+export async function endCaseEarly(caseId: string, newEndDate: string, caregiverConsent: boolean = false) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -147,29 +186,40 @@ export async function endCaseEarly(caseId: string, newEndDate: string) {
   // Fetch case to validate dates
   const { data: currentCase } = await supabase
     .from("cases")
-    .select("start_date")
+    .select("start_date, end_date_expected, end_date_final")
     .eq("id", caseId)
     .single();
     
   if (!currentCase) return { error: "케이스를 찾을 수 없습니다." };
 
+  // 간병인 동의 확인
+  if (!caregiverConsent) {
+    return { error: "간병인 동의가 필요합니다." };
+  }
+
   const newEnd = new Date(newEndDate);
   const start = new Date(currentCase.start_date);
+  const originalEnd = new Date(currentCase.end_date_final || currentCase.end_date_expected);
   const today = new Date();
-  // Normalize today to start of day for comparison
+  // Normalize dates to start of day for comparison
   today.setHours(0,0,0,0);
+  newEnd.setHours(0,0,0,0);
+  start.setHours(0,0,0,0);
+  originalEnd.setHours(0,0,0,0);
 
+  // 검증 1: 시작일보다 빠를 수 없음
   if (newEnd < start) {
       return { error: "종료일은 시작일보다 빠를 수 없습니다." };
   }
-  // M1 Scenario says early end is "Today or Past". 
-  // Strictly speaking, it shouldn't be in the future relative to today?
-  // Let's allow today.
-  if (newEnd > new Date()) {
-      // Ideally we warn, but if user wants to set early end to tomorrow (still earlier than original), maybe allowed?
-      // But Scenario M1-WP4-1 says "Today/Past".
-      // Let's allow it for flexibility but ensure it's earlier than original? 
-      // The UI logic is strict, server logic should at least ensure validity.
+
+  // 검증 2: 기존 종료일보다 빠르거나 같아야 함 (조기종료이므로)
+  if (newEnd >= originalEnd) {
+      return { error: "조기 종료일은 기존 종료일보다 빠른 날짜여야 합니다." };
+  }
+
+  // 검증 3: 과거 날짜는 안됨 (오늘 이후만 가능)
+  if (newEnd < today) {
+      return { error: "조기 종료일은 오늘 이후 날짜만 가능합니다." };
   }
 
   // 1. Update Case
@@ -192,7 +242,7 @@ export async function endCaseEarly(caseId: string, newEndDate: string) {
   redirect(`/cases/${caseId}`);
 }
 
-export async function extendCase(caseId: string, newEndDate: string) {
+export async function extendCase(caseId: string, newEndDate: string, caregiverConsent: boolean = false) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
@@ -205,9 +255,19 @@ export async function extendCase(caseId: string, newEndDate: string) {
   
   if (!currentCase) return { error: "케이스를 찾을 수 없습니다." };
 
+  // 간병인 동의 확인
+  if (!caregiverConsent) {
+    return { error: "간병인 동의가 필요합니다." };
+  }
+
   const currentEnd = new Date(currentCase.end_date_final || currentCase.end_date_expected);
   const newEnd = new Date(newEndDate);
+  
+  // Normalize dates to start of day for comparison
+  currentEnd.setHours(0,0,0,0);
+  newEnd.setHours(0,0,0,0);
 
+  // 검증: 기존 종료일보다 뒤여야 함 (연장이므로)
   if (newEnd <= currentEnd) {
       return { error: "연장할 종료일은 현재 종료일보다 뒤여야 합니다." };
   }
@@ -222,4 +282,47 @@ export async function extendCase(caseId: string, newEndDate: string) {
 
   revalidatePath(`/cases/${caseId}`);
   redirect(`/cases/${caseId}`);
+}
+
+// ================================================
+// 케이스 삭제 (Hard Delete with Confirm)
+// ================================================
+export async function deleteCase(id: string) {
+  const supabase = createClient();
+  
+  // 1. 현재 사용자 확인
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) {
+    return { error: "로그인이 필요합니다." };
+  }
+
+  // 2. 케이스 소유권 확인
+  const { data: caseData } = await supabase
+    .from("cases")
+    .select("guardian_id")
+    .eq("id", id)
+    .single();
+
+  if (!caseData) {
+    return { error: "케이스를 찾을 수 없습니다." };
+  }
+
+  if (caseData.guardian_id !== user.id) {
+    return { error: "권한이 없습니다." };
+  }
+
+  // 3. 케이스 삭제 (CASCADE로 연관 데이터 자동 삭제)
+  const { error } = await supabase
+    .from("cases")
+    .delete()
+    .eq("id", id)
+    .eq("guardian_id", user.id); // 추가 보안
+
+  if (error) {
+    console.error("케이스 삭제 에러:", error);
+    return { error: "삭제에 실패했습니다. 다시 시도해주세요." };
+  }
+
+  revalidatePath("/cases");
+  return { success: true };
 }

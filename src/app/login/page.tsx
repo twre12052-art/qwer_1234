@@ -1,136 +1,175 @@
 "use client";
 
-import { login, signup } from "@/modules/auth/actions";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { login } from "@/modules/auth/actions";
+import { Card, CardHeader, CardBody } from "@/modules/shared/components/Card";
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const router = useRouter();
+  
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  async function handleSubmit(formData: FormData) {
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    
+    if (!username.trim()) {
+      setError("아이디를 입력해주세요.");
+      return;
+    }
+    
+    if (!password) {
+      setError("비밀번호를 입력해주세요.");
+      return;
+    }
+
     setLoading(true);
-    setError(null);
-    setMessage(null);
 
     try {
-      if (isLogin) {
-        const res = await login(formData);
-        if (res?.error) setError(res.error);
+      const result = await login(username.trim(), password);
+      
+      if (result.success) {
+        const redirectPath = result.redirectTo || "/cases";
+        router.push(redirectPath);
+        router.refresh();
       } else {
-        const res = await signup(formData);
-        if (res?.error) setError(res.error);
-        if (res?.message) setMessage(res.message);
+        setError(result.message || "로그인에 실패했습니다.");
       }
-    } catch (e) {
+    } catch (err: any) {
       setError("오류가 발생했습니다. 다시 시도해주세요.");
     } finally {
       setLoading(false);
     }
-  }
+  };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-bold tracking-tight text-gray-900">
-            {isLogin ? "보호자 로그인" : "보호자 회원가입"}
-          </h2>
-        </div>
-        <form action={handleSubmit} className="mt-8 space-y-6">
-          <div className="-space-y-px rounded-md shadow-sm">
-            <div>
-              <label htmlFor="email-address" className="sr-only">
-                이메일 주소
-              </label>
-              <input
-                id="email-address"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                data-testid="email-input"
-                className="relative block w-full rounded-t-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
-                placeholder="이메일 주소"
-              />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-sky-50 to-blue-50 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* 배경 장식 */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-20 left-10 w-64 h-64 bg-blue-200 rounded-full opacity-20 blur-3xl"></div>
+        <div className="absolute bottom-20 right-10 w-80 h-80 bg-sky-200 rounded-full opacity-20 blur-3xl"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-blue-300 rounded-full opacity-10 blur-3xl"></div>
+      </div>
+
+      <Card className="w-full max-w-md relative z-10 border-2 border-blue-200 shadow-2xl bg-white/90 backdrop-blur-sm">
+        <CardHeader className="bg-gradient-to-r from-blue-50 to-sky-50 border-b border-blue-100">
+          <div className="flex items-center gap-3 mb-2">
+            <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-sky-400 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-2xl">💙</span>
             </div>
             <div>
-              <label htmlFor="password" className="sr-only">
+              <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-500 to-sky-500 bg-clip-text text-transparent">
+                로그인
+              </h1>
+            </div>
+          </div>
+          <p className="text-sm text-blue-600 flex items-center gap-2">
+            <span>✨</span>
+            간병노트에 오신 것을 환영합니다
+          </p>
+        </CardHeader>
+
+        <CardBody className="p-8">
+          <form onSubmit={handleLogin} className="space-y-6">
+            {/* 에러 메시지 */}
+            {error && (
+              <div className="bg-red-50 border-2 border-red-200 text-red-600 px-4 py-3 rounded-xl text-base flex items-center gap-2">
+                <span>⚠️</span>
+                {error}
+              </div>
+            )}
+
+            {/* 아이디 */}
+            <div>
+              <label className="block text-base font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>👤</span>
+                아이디
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="아이디를 입력하세요"
+                className="w-full px-5 py-4 border-2 border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all text-base"
+                disabled={loading}
+              />
+            </div>
+
+            {/* 비밀번호 */}
+            <div>
+              <label className="block text-base font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <span>🔒</span>
                 비밀번호
               </label>
               <input
-                id="password"
-                name="password"
                 type="password"
-                autoComplete="current-password"
-                required
-                data-testid="password-input"
-                className={`relative block w-full ${isLogin ? "rounded-b-md" : ""} border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3`}
-                placeholder="비밀번호"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="비밀번호를 입력하세요"
+                className="w-full px-5 py-4 border-2 border-blue-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all text-base"
+                disabled={loading}
               />
             </div>
-            {!isLogin && (
-              <div>
-                <label htmlFor="fullName" className="sr-only">
-                  이름
-                </label>
-                <input
-                  id="fullName"
-                  name="fullName"
-                  type="text"
-                  required
-                  className="relative block w-full rounded-b-md border-0 py-1.5 text-gray-900 ring-1 ring-inset ring-gray-300 placeholder:text-gray-400 focus:z-10 focus:ring-2 focus:ring-inset focus:ring-indigo-600 sm:text-sm sm:leading-6 px-3"
-                  placeholder="이름"
-                />
-              </div>
-            )}
-          </div>
 
-          {error && (
-            <div className="text-sm text-red-600 text-center">{error}</div>
-          )}
-          {message && (
-            <div className="text-sm text-green-600 text-center">{message}</div>
-          )}
-
-          <div>
+            {/* 로그인 버튼 */}
             <button
               type="submit"
               disabled={loading}
-              data-testid="submit-button"
-              className="group relative flex w-full justify-center rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50"
+              className="w-full bg-gradient-to-r from-blue-400 to-sky-400 text-white py-4 rounded-xl font-bold text-lg hover:from-blue-500 hover:to-sky-500 disabled:from-gray-300 disabled:to-gray-400 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl transform hover:scale-105 disabled:transform-none"
             >
-              {loading
-                ? "처리 중..."
-                : isLogin
-                ? "로그인"
-                : "회원가입"}
+              {loading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  로그인 중...
+                </span>
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  로그인
+                  <span>✨</span>
+                </span>
+              )}
             </button>
-          </div>
-        </form>
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setIsLogin(!isLogin);
-              setError(null);
-              setMessage(null);
-            }}
-            className="text-sm text-indigo-600 hover:text-indigo-500"
-          >
-            {isLogin
-              ? "계정이 없으신가요? 회원가입"
-              : "이미 계정이 있으신가요? 로그인"}
-          </button>
-        </div>
-        <div className="text-center mt-4">
-            <Link href="/privacy" className="text-xs text-gray-500 hover:underline">
-                개인정보 처리방침
+          </form>
+
+          {/* 하단 링크 */}
+          <div className="mt-8 space-y-4">
+            {/* 회원가입 버튼 */}
+            <Link
+              href="/signup"
+              className="block w-full text-center border-2 border-sky-200 text-blue-600 py-4 rounded-xl font-semibold hover:bg-blue-50 hover:border-blue-300 transition-all"
+            >
+              <span className="flex items-center justify-center gap-2">
+                회원가입
+                <span>✨</span>
+              </span>
             </Link>
-        </div>
-      </div>
+
+            {/* 아이디/비밀번호 찾기 */}
+            <div className="flex gap-4 justify-center text-base pt-4 border-t border-blue-100">
+              <Link
+                href="/auth/find-id"
+                className="text-blue-600 hover:text-sky-500 transition-colors flex items-center gap-1"
+              >
+                <span>🔍</span>
+                아이디 찾기
+              </Link>
+              <span className="text-blue-200">|</span>
+              <Link
+                href="/auth/find-password"
+                className="text-blue-600 hover:text-sky-500 transition-colors flex items-center gap-1"
+              >
+                <span>🔑</span>
+                비밀번호 찾기
+              </Link>
+            </div>
+          </div>
+        </CardBody>
+      </Card>
     </div>
   );
 }
